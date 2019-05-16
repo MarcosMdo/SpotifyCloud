@@ -1,2 +1,4 @@
 spotipy
 wordcloud
+bs4
+matplotlib

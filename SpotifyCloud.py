@@ -7,7 +7,7 @@ import time
 import requests
 from bs4 import BeautifulSoup
 import re
-from wordcloud import WordCloud
+from wordcloud import WordCloud, ImageColorGenerator
 import numpy as np
 from PIL import Image
 from os import path
@@ -21,86 +21,86 @@ import argparse
 FILE = os.path.dirname(__file__)
 STOPWORDS = set(map(str.strip, open(os.path.join(FILE, 'stopwords')).readlines()))
 
-def scrap_song_url(url):
-    print("Scrapping song")
-    page = requests.get(url)
-    html = BeautifulSoup(page.text, 'html.parser')
-    lyrics = html.find('div', class_='lyrics').get_text()
-    lyrics = cleanLyrics(lyrics.split())
-    return lyrics
+class SpotifyCloud():
+    
+    def __init__(self, number_songs=25, time_range='long_term', offset=0,
+        lyric=True, height=1792, width=828, max_words=200, mask=None,
+        max_font_size=350):
 
-def request_song_info(song_title, artist_name):
-    search_url = geniusconfig['BASE_URL'] + '/search'
-    headers = {'Authorization': 'Bearer ' + geniusconfig['GENIUS_SECRET']}
-    data = {'q': song_title + ' ' + artist_name}
-    response = requests.get(search_url, data=data, headers=headers)
+        self.number_songs = number_songs
+        self.time_range = time_range
+        self.offset = offset
+        self.lyric = lyric
+        self.width = width
+        self.height = height
+        self.max_words = max_words
+        self.mask = mask
+        self.max_font_size = max_font_size
+        self.mask = mask
 
-    return response
+    def scrap_song_url(self, url):
+        print("Scrapping song")
+        page = requests.get(url)
+        html = BeautifulSoup(page.text, 'html.parser')
+        lyrics = html.find('div', class_='lyrics').get_text()
+        lyrics = self.cleanLyrics(lyrics.split())
+        return lyrics
 
+    def request_song_info(self, song_title, artist_name):
+        search_url = geniusconfig['BASE_URL'] + '/search'
+        headers = {'Authorization': 'Bearer ' + geniusconfig['GENIUS_SECRET']}
+        data = {'q': song_title + ' ' + artist_name}
+        response = requests.get(search_url, data=data, headers=headers)
+        return response
 
-def createWordCloud(textFile):
-    d = path.dirname(__file__) if "__file__" in locals() else os.getcwd()
-    spotify_mask = np.array(Image.open(path.join(d, "masks/spotify-mask-2.png")))
-    text = open(path.join(d, textFile)).read()
-    my_stopwords = set(STOPWORDS)
+    def grey_color_func(self, word, font_size, position, orientation, random_state=None, **kwargs):
+        return "hsl(0, 0%%, %d%%)" % random.randint(60, 100)
 
-    wc = WordCloud(max_words=100, mask=None, stopwords=my_stopwords, margin=10,
-           random_state=1, collocations=True).generate(text)
+    def createWordCloud(self, textFile):
+        d = path.dirname(__file__) if "__file__" in locals() else os.getcwd()
+        jamiexx = np.array(Image.open(path.join(d, "incolorphone.png")))
+        spotify_mask = None
 
-    default_colors = wc.to_array()
-    wc.to_file("cloud.png")
-    plt.title("Default colors")
-    plt.imshow(default_colors, interpolation="bilinear")
-    plt.axis("off")
-    plt.show()
+        if self.mask is None:
+            spotify_mask = None
+        else:
+            spotify_mask = np.array(Image.open(path.join(d, self.mask)))
+        
+        text = open(path.join(d, textFile)).read()
+        my_stopwords = set(STOPWORDS)
 
-def cleanLyrics(lyrics):
-    unwanted = [False] * len(lyrics)
-    final = []
+        wc = WordCloud(max_words=self.max_words, mask=jamiexx, stopwords=my_stopwords, margin=10,
+            random_state=1, collocations=True, width=self.width, height=self.height,
+            max_font_size=self.max_font_size).generate(text)
 
-    for i in lyrics:
-        if i[0] == '[':
-            unwanted[lyrics.index(i)] = True
+        # create coloring from image
+        image_colors = ImageColorGenerator(jamiexx)
 
-    final = [i for (i, n) in zip(lyrics, unwanted) if n is False]
-    return ' '.join(final)
+        default_colors = wc.to_array()
+
+        # recolor wordcloud and show
+        # we could also give color_func=image_colors directly in the constructor
+        plt.imshow(wc.recolor(color_func=image_colors), interpolation="bilinear")
+        # plt.title("Default colors")
+        # plt.imshow(image_colors, interpolation="bilinear")
+        # plt.axis("off")
+        plt.show()
+        wc.to_file("cloud.png")
+
+    def cleanLyrics(self, lyrics):
+        unwanted = [False] * len(lyrics)
+        final = []
+
+        for i in lyrics:
+            if i[0] == '[':
+                unwanted[lyrics.index(i)] = True
+
+        final = [i for (i, n) in zip(lyrics, unwanted) if n is False]
+        return ' '.join(final)
 
 
 def main():
-
-    parser = argparse.ArgumentParser(description='WordCloud parameters.')
-    parser.add_argument('-n', '--numsongs', type=int,
-                help='Number of tracks included. 0-50')
-    parser.add_argument('-t', '--timerange', type=str,
-                help='Time length of where songs are chosen from. short_term, medium_term or long_term')
-    parser.add_argument('-o', '--offset', type=int,
-                help='Offset of where songs are picked from.')
-    parser.add_argument('-a', '--artist', type=bool,
-                help='Decision to make a word cloud from the artists. Default makes a word cloud form the lyrics.')
-
-    args = parser.parse_args()
-
-    if args.artist is not None:
-        artistCloud = True
-        lyricCloud = False
-    else:
-        artistCloud = False
-        lyricCloud = True
-
-    if args.numsongs is not None:
-        num_songs = args.numsongs
-    else:
-        num_songs = 15 # first index of songs to scrape    
-
-    if args.timerange is not None:
-        time_range = args.timerange
-    else:
-        time_range = 'medium_term'
-
-    if args.offset is not None:
-        offset = args.offset
-    else:
-        offset = 0 # first index of songs to scrape
+    sc = SpotifyCloud()
 
     # Spotify Token. USER specifies who is being asked for authorization,
     # å so will need to be a passed in value that is stored once the user is validated.    
@@ -109,9 +109,10 @@ def main():
         redirect_uri=spotifyconfig['REDIRECT_URI'])
     
     if token:
+
         sp = spotipy.Spotify(auth=token)
-       
-        tracks = sp.current_user_top_tracks(limit=num_songs, offset=offset, time_range=time_range)['items']
+    
+        tracks = sp.current_user_top_tracks(limit=sc.number_songs, offset=sc.offset, time_range=sc.time_range)['items']
         
         all_lyrics = []
         all_artists = []
@@ -121,7 +122,7 @@ def main():
             artist_name = t['album']['artists'][0]['name']
             track_name = t['name']
             
-            response = request_song_info(track_name, artist_name)
+            response = sc.request_song_info(track_name, artist_name)
             json = response.json()
             remote_song_info = None
 
@@ -131,32 +132,28 @@ def main():
                     remote_song_info = hit
                     break
             
-            if lyricCloud:
+            if sc.lyric:
                 # if song info found, collect data.
                 if remote_song_info:
                         song_url = remote_song_info['result']['url']
-                        lyrics = scrap_song_url(song_url)
+                        lyrics = sc.scrap_song_url(song_url)
                         all_lyrics.append(lyrics)
-            elif artistCloud:
-                    all_artists.append(artist_name)
+            else:
+                all_artists.append(artist_name)
     
         temp_list = []
-        if lyricCloud:
+        if sc.lyric:
             for i in all_lyrics:
                 temp_list.append(''.join(i))
-        elif artistCloud:
-            for i in all_artists:
-                temp_list.append(''.join(i))
-
-        if lyricCloud:
             with open("Lyrics.txt", "w") as text_file:
                 text_file.write(' '.join(temp_list))
-            createWordCloud("Lyrics.txt")
-        
-        if artistCloud:
+            sc.createWordCloud("Lyrics.txt")
+        else:
+            for i in all_artists:
+                temp_list.append(''.join(i))
             with open("Artists.txt", "w") as artist_file:
                 artist_file.write(' '.join(temp_list))
-            createWordCloud("Artists.txt")
+            sc.createWordCloud("Artists.txt")
 
 if __name__ == "__main__":
-        main()
+    main()

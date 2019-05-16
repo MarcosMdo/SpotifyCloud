@@ -9,6 +9,7 @@ from bs4 import BeautifulSoup
 import re
 from wordcloud import WordCloud, ImageColorGenerator
 import numpy as np
+import PIL
 from PIL import Image
 from os import path
 import random
@@ -20,26 +21,46 @@ import argparse
 
 FILE = os.path.dirname(__file__)
 STOPWORDS = set(map(str.strip, open(os.path.join(FILE, 'stopwords')).readlines()))
+MAX_FONT_SIZE_DESKTOP = 400
+MAX_WORDS_DESKTOP = 500
+MAX_FONT_SIZE_MOBILE = 400
+MAX_WORDS_MOBILE = 300
 
 class SpotifyCloud():
     
-    def __init__(self, number_songs=25, time_range='long_term', offset=0,
-        lyric=True, height=1792, width=828, max_words=200, mask=None,
-        max_font_size=350):
+    def __init__(self, number_songs=50, time_range='short_term', offset=0,
+        lyric=True, height=100, width=1000, max_words=200,
+        max_font_size=350, theme='random', viewport='custom', min_font_size=4):
 
         self.number_songs = number_songs
         self.time_range = time_range
         self.offset = offset
         self.lyric = lyric
-        self.width = width
-        self.height = height
-        self.max_words = max_words
-        self.mask = mask
-        self.max_font_size = max_font_size
-        self.mask = mask
+        self.theme = theme
+        self.viewport = viewport
+        
+        if not lyric:
+            self.number_songs = 50
+
+        if self.viewport == 'desktop':
+            self.width = 1920
+            self.height = 1080
+            self.max_font_size = MAX_FONT_SIZE_DESKTOP
+            self.max_words = MAX_WORDS_DESKTOP
+        elif self.viewport == 'mobile':
+            self.width = 720
+            self.height = 1280
+            self.max_font_size = MAX_FONT_SIZE_MOBILE
+            self.max_words = MAX_WORDS_MOBILE
+        else:
+            self.width = width
+            self.height = height
+            self.max_font_size = max_font_size
+            self.max_words = max_words
+            self.min_font_size = min_font_size
+
 
     def scrap_song_url(self, url):
-        print("Scrapping song")
         page = requests.get(url)
         html = BeautifulSoup(page.text, 'html.parser')
         lyrics = html.find('div', class_='lyrics').get_text()
@@ -56,36 +77,50 @@ class SpotifyCloud():
     def grey_color_func(self, word, font_size, position, orientation, random_state=None, **kwargs):
         return "hsl(0, 0%%, %d%%)" % random.randint(60, 100)
 
+    def resizeImage(self):
+        path_to_image = 'themes/' + self.theme + '-desktop.png'
+        img = Image.open(path_to_image)
+        img = img.resize((self.width, self.height), PIL.Image.ANTIALIAS)
+        new_file = 'themes/' + self.theme + '-custom.png'
+        img.save(new_file)
+        return new_file
+        
+
     def createWordCloud(self, textFile):
         d = path.dirname(__file__) if "__file__" in locals() else os.getcwd()
-        jamiexx = np.array(Image.open(path.join(d, "incolorphone.png")))
-        spotify_mask = None
-
-        if self.mask is None:
-            spotify_mask = None
-        else:
-            spotify_mask = np.array(Image.open(path.join(d, self.mask)))
         
         text = open(path.join(d, textFile)).read()
         my_stopwords = set(STOPWORDS)
 
-        wc = WordCloud(max_words=self.max_words, mask=jamiexx, stopwords=my_stopwords, margin=10,
+        wc = WordCloud(max_words=self.max_words, stopwords=my_stopwords, margin=10,
             random_state=1, collocations=True, width=self.width, height=self.height,
             max_font_size=self.max_font_size).generate(text)
-
-        # create coloring from image
-        image_colors = ImageColorGenerator(jamiexx)
-
-        default_colors = wc.to_array()
-
-        # recolor wordcloud and show
-        # we could also give color_func=image_colors directly in the constructor
-        plt.imshow(wc.recolor(color_func=image_colors), interpolation="bilinear")
-        # plt.title("Default colors")
-        # plt.imshow(image_colors, interpolation="bilinear")
-        # plt.axis("off")
-        plt.show()
-        wc.to_file("cloud.png")
+        
+        if self.viewport == 'custom':
+            if self.theme != 'random':
+                path_to_theme = self.resizeImage()
+                theme_mask = np.array(Image.open(path.join(d, path_to_theme)))
+                image_colors = ImageColorGenerator(theme_mask)
+                plt.imshow(wc.recolor(color_func=image_colors), interpolation="bilinear")
+                wc.to_file("cloud.png")
+                os.remove(path_to_theme)
+            else:
+                default_colors = wc.to_array()
+                plt.title("Default colors")
+                plt.imshow(default_colors, interpolation="bilinear")
+                wc.to_file("cloud.png")
+        elif self.theme == 'random':
+            default_colors = wc.to_array()
+            plt.title("Default colors")
+            plt.imshow(default_colors, interpolation="bilinear")
+            wc.to_file("cloud.png")
+        else:
+            path_to_theme = 'themes/' + self.theme + '-' + self.viewport + '.png'
+            theme_mask = np.array(Image.open(path.join(d, path_to_theme)))
+            image_colors = ImageColorGenerator(theme_mask)
+            plt.imshow(wc.recolor(color_func=image_colors), interpolation="bilinear")
+            wc.to_file("cloud.png")
+  
 
     def cleanLyrics(self, lyrics):
         unwanted = [False] * len(lyrics)

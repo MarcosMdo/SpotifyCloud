@@ -23,14 +23,15 @@ FILE = os.path.dirname(__file__)
 STOPWORDS = set(map(str.strip, open(os.path.join(FILE, 'stopwords')).readlines()))
 MAX_FONT_SIZE_DESKTOP = 400
 MAX_WORDS_DESKTOP = 500
-MAX_FONT_SIZE_MOBILE = 400
-MAX_WORDS_MOBILE = 300
+MAX_FONT_SIZE_MOBILE = 750
+MAX_WORDS_MOBILE = 350
 
 class SpotifyCloud():
     
-    def __init__(self, number_songs=50, time_range='short_term', offset=0,
-        lyric=True, height=100, width=1000, max_words=200,
-        max_font_size=350, theme='random', viewport='custom', min_font_size=4):
+    def __init__(self, number_songs=50, time_range='long_term', offset=0,
+        lyric=True, height=1080, width=1920, max_words=250,
+        max_font_size=350, theme='random', viewport='desktop', min_font_size=4,
+        background_color='black'):
 
         self.number_songs = number_songs
         self.time_range = time_range
@@ -38,6 +39,7 @@ class SpotifyCloud():
         self.lyric = lyric
         self.theme = theme
         self.viewport = viewport
+        self.background_color = background_color
         
         if not lyric:
             self.number_songs = 50
@@ -48,7 +50,7 @@ class SpotifyCloud():
             self.max_font_size = MAX_FONT_SIZE_DESKTOP
             self.max_words = MAX_WORDS_DESKTOP
         elif self.viewport == 'mobile':
-            self.width = 720
+            self.width = 640
             self.height = 1280
             self.max_font_size = MAX_FONT_SIZE_MOBILE
             self.max_words = MAX_WORDS_MOBILE
@@ -93,8 +95,8 @@ class SpotifyCloud():
         my_stopwords = set(STOPWORDS)
 
         wc = WordCloud(max_words=self.max_words, stopwords=my_stopwords, margin=10,
-            random_state=1, collocations=True, width=self.width, height=self.height,
-            max_font_size=self.max_font_size).generate(text)
+            random_state=1, collocations=False, width=self.width, height=self.height,
+            max_font_size=self.max_font_size, background_color=self.background_color).generate(text)
         
         if self.viewport == 'custom':
             if self.theme != 'random':
@@ -135,7 +137,9 @@ class SpotifyCloud():
 
 
 def main():
-    sc = SpotifyCloud()
+    sc = SpotifyCloud(number_songs=10, time_range='long_term', offset=0,
+        lyric=True, height=1792, width=828, max_words=250,
+        max_font_size=350, theme='kay', viewport='custom', min_font_size=12, background_color='lightblue')
 
     # Spotify Token. USER specifies who is being asked for authorization,
     # å so will need to be a passed in value that is stored once the user is validated.    
